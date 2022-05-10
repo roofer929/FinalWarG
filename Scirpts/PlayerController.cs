@@ -1,8 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
-public enum PlayerStatus
+public enum ActionStatus
 {
     Move,
     Run,
@@ -31,9 +32,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField]
     private Camera cam;
     private Rigidbody rigid;
-
-    private PlayerStatus myStatus = PlayerStatus.Idle;
+    private ActionStatus myStatus = ActionStatus.Idle; //* 플레이어 행동 상태
     private Animator myAnimator;
+    private event Action OnStatusChanged; //* 플레이어 행동 상태가 변경되었을 때 호출되는 이벤트
 
 
     void Start()
@@ -45,26 +46,22 @@ public class PlayerController : MonoBehaviour
         Manager.Input.keyAction += OnKeyBoard;
         Manager.Input.nullKeyAction -= OffKeyBoard;
         Manager.Input.nullKeyAction += OffKeyBoard;
-    }
 
-    private void Update()
-    {
-        AnimationController();
+        OnStatusChanged += AnimationController;
     }
 
     ///<Summary>
     /// 플레이어의 기본 움직임을 제어합니다.
     ///</Summary>
     private void Move()
-    {
-        Debug.Log("Move Move");
+    {        
         float _moveDirX = Input.GetAxisRaw("Horizontal");
         float _moveDirZ = Input.GetAxisRaw("Vertical");
 
         if (_moveDirX == 0 && _moveDirZ == 0)
         {
             Debug.Log("멈춰있는 상태입니다.");
-            myStatus = PlayerStatus.Idle;
+            ChangePlayerStatus(ActionStatus.Idle);
             return;
         }
 
@@ -73,17 +70,16 @@ public class PlayerController : MonoBehaviour
 
         float speedValue = speed;
 
+        //* 달리기
         if (Input.GetKey(KeyCode.LeftShift))
-        {
-            //달리기
-            //TODO : 속도 증가 , 상태 변경 
-            speedValue *= 1.5f;
-            myStatus = PlayerStatus.Run;
-
+        {                     
+            speedValue *= 2f;            
+            ChangePlayerStatus(ActionStatus.Run);
         }
+        //* 일반 이동
         else
         {
-            myStatus = PlayerStatus.Move;
+            ChangePlayerStatus(ActionStatus.Move);
         }
 
         Vector3 _velocity = (_moveHorizontal + _moveVertical).normalized * speedValue;
@@ -96,6 +92,16 @@ public class PlayerController : MonoBehaviour
 
     }
 
+
+    ///<Summary>
+    /// 플레이어의 동적 상태를 변경합니다.
+    ///</Summary>
+    public void ChangePlayerStatus(ActionStatus status)
+    {
+        myStatus = status;
+        OnStatusChanged();
+    }
+
     ///<Summary>
     /// 플레이어의 애니메이션을 관리 및 재생합니다.
     ///</Summary>
@@ -103,33 +109,31 @@ public class PlayerController : MonoBehaviour
     {
         switch (myStatus)
         {
-            case PlayerStatus.Idle:
-            myAnimator.SetBool("Move", false);
+            case ActionStatus.Idle:
+                myAnimator.SetBool("Move", false);
                 myAnimator.SetBool("Idle", true);
+                myAnimator.SetBool("Run", false);
 
                 break;
-            case PlayerStatus.Move:
-                myAnimator.SetBool("Idle", false);
-                if (myAnimator.GetBool("Move"))
-                {
-                    return;
-                }
+            case ActionStatus.Move:
+                myAnimator.SetBool("Idle", false);                
                 myAnimator.SetBool("Move", true);
+                myAnimator.SetBool("Run", false);
                 break;
-            case PlayerStatus.Run:
+            case ActionStatus.Run:
                 myAnimator.SetBool("Idle", false);
-                myAnimator.SetTrigger("Move");
-                myAnimator.SetTrigger("Run");
+                myAnimator.SetBool("Move", false);
+                myAnimator.SetBool("Run", true);
                 break;
-            case PlayerStatus.CrouchIdle:
+            case ActionStatus.CrouchIdle:
                 break;
-            case PlayerStatus.CrouchMove:
+            case ActionStatus.CrouchMove:
                 break;
-            case PlayerStatus.CrawlIdle:
+            case ActionStatus.CrawlIdle:
                 break;
-            case PlayerStatus.CrawlMove:
+            case ActionStatus.CrawlMove:
                 break;
-            case PlayerStatus.Die:
+            case ActionStatus.Die:
                 break;
 
         }
@@ -153,8 +157,6 @@ public class PlayerController : MonoBehaviour
         float _yRotation = Input.GetAxisRaw("Mouse X");
         Vector3 _characterRotationY = new Vector3(0f, _yRotation, 0f) * lookSensitivity;
         rigid.MoveRotation(rigid.rotation * Quaternion.Euler(_characterRotationY)); // 쿼터니언 * 쿼터니언
-                                                                                    // Debug.Log(myRigid.rotation);  // 쿼터니언
-                                                                                    // Debug.Log(myRigid.rotation.eulerAngles); // 벡터
     }
 
     public void OnKeyBoard()
@@ -166,6 +168,7 @@ public class PlayerController : MonoBehaviour
 
     public void OffKeyBoard()
     {
-        myStatus = PlayerStatus.Idle;
+        Debug.Log("키보드 입력 없음");
+        myStatus = ActionStatus.Idle;
     }
 }
